@@ -1,4 +1,4 @@
-import dbConnect from "@/lib/dbConnect"
+import dbConnect from "@/lib/dbConnect";
 import  { UserModel }  from "@/model/User";
 import bcrypt from "bcryptjs"
 
@@ -7,12 +7,11 @@ import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest){
     try {
-        
+        await dbConnect();
         const {username, email, password} = await req.json();
         
         const existingUserVerifiedByUsername = await UserModel.findOne({
             username,
-            isVerified: true
         });
 
         if(existingUserVerifiedByUsername) {
