@@ -1,88 +1,122 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { SubmitHandler, useForm } from "react-hook-form";
-import * as z from "zod";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useDebounceValue } from "usehooks-ts";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { signInSchema } from "@/schemas/signInSchema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signUpSchema } from "@/schemas/signUpSchema";
-import axios, { AxiosError } from "axios";
-import { ApiResponse } from "@/types/ApiResponse";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 const page = () => {
-  const [username, setUsername] = useState("");
-  const [usernameMessage, setUsernameMessage] = useState("");
-  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const debouncedUsername = useDebounceValue(username, 300);
   const { toast } = useToast();
   const router = useRouter();
 
-  const form = useForm<z.infer<typeof signUpSchema>>({
-    resolver: zodResolver(signUpSchema),
+  const form = useForm<z.infer<typeof signInSchema>>({
+    resolver: zodResolver(signInSchema),
     defaultValues: {
-      username: "",
-      email: "",
+      identifier: "",
       password: "",
     },
   });
 
-  useEffect(() => {
-    const checkUsernameUnique = async () => {
-      if (debouncedUsername) {
-        setIsCheckingUsername(true);
-        setUsername("");
-
-        try {
-          const resp = await axios.get<ApiResponse>(`/api/check-username-unique?username=${debouncedUsername}`);
-          setUsernameMessage(resp.data.message);
-        } catch (error) {
-          const axiosError = error as AxiosError<ApiResponse>;
-          setUsernameMessage(axiosError.response?.data.message ?? "Error checking username")
-        } finally {
-          setIsCheckingUsername(false);
-        }
-      }
-    }
-    checkUsernameUnique();
-  }, [debouncedUsername]);
-
-  const onSubmit = async (data: z.infer<typeof signUpSchema>) => {
-    setIsSubmitting(true);
-    try {
-      const resp = await axios.post<ApiResponse>('/api/sign-up', data);
+  const onSubmit = async (data: z.infer<typeof signInSchema>) => {
+    const res = await signIn("credentials", {
+      redirect: false,
+      identifier: data.identifier,
+      password: data.password,
+    });
+    if (res?.error) {
       toast({
-        title:"Success",
-        description: resp.data.message
+        title: "Login Failed",
+        description: "Incorrect username or password",
+        variant: "destructive",
       });
-      router.replace(`/verify/${username}`);
-      setIsSubmitting(false);
-    } catch (error) {
-      console.error("Error in signup of user", error);
-      const axiosError = error as AxiosError<ApiResponse>;
-      let errorMessage = axiosError.response?.data.message;
-      toast({
-        title:"SignUp Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-      setIsSubmitting(false);
     }
-  }
 
-  return <div className="flex justify-center items-center min-h-screen bg-gray-100">
-    <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-      <div className="text-center">
-        <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl mb-6">Join Mystery Message</h1>
-        <p className="mb-4">Sign up to start your anonymous adventure</p>
+    if (res?.url) {
+      router.replace("/dashboard");
+    }
+    toast({
+      title: "Login Failed",
+      description: "Incorrect username or password",
+      variant: "destructive",
+    });
+  };
+
+  return (
+    <div className="flex justify-center items-center min-h-screen bg-gray-100">
+      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
+        <div className="text-center">
+          <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl mb-6">
+            Mystery Message
+          </h1>
+          <p className="mb-4">Sign In to start your anonymous adventure</p>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="identifier"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email / Username</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="username or email"
+                      type="text"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input placeholder="password" type="password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-center">
+              <Button type="submit">Sign In</Button>
+            </div>
+          </form>
+        </Form>
+        <div className="text-center mt-4">
+          <p>
+            New member ?{" "}
+            <Link
+              href={"/sign-up"}
+              className="text-blue-600 hover:text-blue-800"
+            >
+              {" "}
+              Sign Up
+            </Link>
+          </p>
+        </div>
       </div>
-      
     </div>
-  </div>;
+  );
 };
 
 export default page;
